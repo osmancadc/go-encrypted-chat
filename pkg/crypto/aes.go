@@ -10,6 +10,10 @@ type AES struct {
 	key []byte
 }
 
+func (a *AES) GetKey() []byte {
+	return a.key
+}
+
 func GenerateAES(size int) (*AES, error) {
 
 	key := make([]byte, size)

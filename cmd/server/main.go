@@ -8,23 +8,13 @@ import (
 
 func main() {
 	fmt.Println("----------------------------------------------- SECURE CHAT INITIALIZED -----------------------------------------------")
-	aesInstance, err := crypto.GenerateAES(32)
-	if err != nil {
-		fmt.Println("Error generating AES key")
-		return
-	}
 
-	plainMessage := "hello world"
-	encryptedMessage, err := aesInstance.EncryptWithAESGCM([]byte(plainMessage))
-	if err != nil {
-		fmt.Println("Error encrypting message")
-		return
-	}
+	rsaInstance, _ := crypto.GenerateRSA(2048)
+	aesInstance, _ := crypto.GenerateAES(32)
 
-	decryptedMessage, err := aesInstance.DecryptWithAESGCM(encryptedMessage)
-	if err != nil {
-		fmt.Println("Error decrypting message")
-	}
+	encrypted, _ := rsaInstance.EncryptMessage(aesInstance.GetKey())
+	decrypted, _ := rsaInstance.DecryptMessage(encrypted)
+	fmt.Println("===========================================DECRYPTED===========================================")
+	fmt.Println(decrypted)
 
-	fmt.Println(string(decryptedMessage))
 }
