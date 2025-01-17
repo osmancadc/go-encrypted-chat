@@ -3,8 +3,27 @@ package crypto
 import (
 	"crypto/aes"
 	"crypto/cipher"
-	"crypto/rand"
+	"fmt"
 )
+
+type CipherFactory interface {
+	newCipher(key []byte) (cipher.Block, error)
+	newGCM(block cipher.Block) (cipher.AEAD, error)
+}
+
+type Encryptor struct{}
+
+func (d *Encryptor) newCipher(key []byte) (cipher.Block, error) {
+	return aes.NewCipher(key)
+}
+
+func (d *Encryptor) newGCM(block cipher.Block) (cipher.AEAD, error) {
+	return cipher.NewGCM(block)
+}
+
+type Reader interface {
+	Read(p []byte) (n int, err error)
+}
 
 type AES struct {
 	key []byte
@@ -14,42 +33,43 @@ func (a *AES) GetKey() []byte {
 	return a.key
 }
 
-func GenerateAES(size int) (*AES, error) {
-
+func GenerateAES(size int, randReader Reader) (*AES, error) {
 	key := make([]byte, size)
 
-	_, err := rand.Read(key)
+	if size != 16 && size != 24 && size != 32 {
+		return nil, fmt.Errorf("error generating AES key, invalid size %d, must be 16, 28 or 32 bytes", size)
+	}
+
+	_, err := randReader.Read(key)
 	if err != nil {
 		return nil, err
 	}
 
-	return &AES{
-		key: key,
-	}, nil
+	return &AES{key: key}, nil
 }
 
-func generateNonce() (nonce []byte, err error) {
+func generateNonce(randReader Reader) (nonce []byte, err error) {
 	nonce = make([]byte, 12)
 
-	if _, err := rand.Read(nonce); err != nil {
+	if _, err := randReader.Read(nonce); err != nil {
 		return nil, err
 	}
 	return nonce, nil
 }
 
-func (a *AES) EncryptWithAESGCM(plaintext []byte) (ciphertext []byte, err error) {
+func (a *AES) EncryptWithAESGCM(factory CipherFactory, randReader Reader, plaintext []byte) (ciphertext []byte, err error) {
 
-	nonce, err := generateNonce()
+	nonce, err := generateNonce(randReader)
 	if err != nil {
 		return
 	}
 
-	block, err := aes.NewCipher(a.key)
+	block, err := factory.newCipher(a.key)
 	if err != nil {
 		return
 	}
 
-	gcm, err := cipher.NewGCM(block)
+	gcm, err := factory.newGCM(block)
 	if err != nil {
 		return
 	}
@@ -61,16 +81,16 @@ func (a *AES) EncryptWithAESGCM(plaintext []byte) (ciphertext []byte, err error)
 	return
 }
 
-func (a *AES) DecryptWithAESGCM(ciphertext []byte) (plaintext []byte, err error) {
+func (a *AES) DecryptWithAESGCM(factory CipherFactory, ciphertext []byte) (plaintext []byte, err error) {
 	nonce := ciphertext[:12]
 	ciphertext = ciphertext[12:]
 
-	block, err := aes.NewCipher(a.key)
+	block, err := factory.newCipher(a.key)
 	if err != nil {
 		return
 	}
 
-	gcm, err := cipher.NewGCM(block)
+	gcm, err := factory.newGCM(block)
 	if err != nil {
 		return
 	}
