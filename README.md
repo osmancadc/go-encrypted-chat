@@ -1,6 +1,6 @@
 # Chat Encriptado de Extremo a Extremo (E2E) en Golang
 
-<!-- ![Logo](aquí_va_la_ruta_de_la_imagen.png) -->
+<!-- ![Logo](logo.png) -->
 **Un chat seguro y descentralizado, donde tu privacidad es lo primero.** 
 
 Este proyecto implementa una aplicación de chat encriptado de extremo a extremo (E2E) utilizando Go y WebSockets. A diferencia de las aplicaciones de chat tradicionales, no hay un servidor central que almacene o tenga acceso a tus mensajes. Solo tú y los destinatarios previstos pueden leerlos.
@@ -19,54 +19,115 @@ Este proyecto implementa una aplicación de chat encriptado de extremo a extremo
 
 El proyecto se divide en los siguientes paquetes principales:
 
+*   `cmd/server`: Contiene el punto de entrada principal de la aplicación (`main.go`).
+*   `config`: Gestiona la configuración de la aplicación, incluyendo las claves criptográficas (`config.go`). 
 *   `internal/websocket`: Maneja la comunicación WebSocket.
     *   `client.go`: Gestiona las conexiones WebSocket individuales.
     *   `message.go`: Define las estructuras de los mensajes y payloads.
-    * `websocket.go`: contiene la configuración del servidor websocket.
-*   `internal/chat`: Contiene la lógica del chat.
+*   `pkg/chat`: Contiene la lógica del chat.
+    *   `encryption.go`: Funciones de encriptación específicas del chat.
+    *   `message.go`: Estructuras de mensajes del chat.
+    *   `room.go`: Lógica de las salas de chat.
     *   `user.go`: Define la estructura `User`.
-*   `internal/config`: Gestiona la configuración de la aplicación, incluyendo las claves criptográficas.
-* `pkg/crypto`: Contiene la implementacion del cifrado RSA y AES.
+*   `pkg/crypto`: Contiene la implementación del cifrado.
+    *   `aes.go`: Funciones para cifrado AES.
+    *   `rsa.go`: Funciones para cifrado RSA.
+*   `logger`: Contiene la lógica de logging de la aplicación.
 
-![Diagrama de la arquitectura (opcional)](aquí_va_la_ruta_del_diagrama.png) ## Flujo de Funcionamiento (Ejemplo: Envío de un Mensaje)
+![Diagrama de arquitectura](arquitectura.png)
 
-1.  El usuario A escribe un mensaje.
-2.  El cliente de A obtiene la clave simétrica del grupo desde la configuración.
-3.  El cliente de A cifra el mensaje con la clave simétrica.
-4.  El cliente de A envía el mensaje cifrado a través de WebSockets.
-5.  El cliente del usuario B recibe el mensaje cifrado.
-6.  El cliente de B obtiene la clave simétrica del grupo desde su configuración.
-7.  El cliente de B descifra el mensaje.
-8.  El mensaje descifrado se muestra al usuario B.
+## Flujos de funcionamiento
 
-## Manejo de Claves
+### Establecimiento de una conexión segura (Handshake)
 
-*   **Claves RSA (Asimétricas):**
-    *   Se genera un par de claves RSA (pública y privada) para cada usuario al iniciar la aplicación.
-    *   La clave *privada* se guarda de forma segura en la configuración del usuario.
-    *   La clave *pública* se comparte con otros usuarios para el intercambio de claves simétricas.
-*   **Claves AES (Simétricas):**
-    *   Cada grupo de chat tiene una clave AES única.
-    *   La clave AES se genera al crear el grupo y se distribuye de forma segura entre los miembros del grupo utilizando cifrado RSA.
+El establecimiento de una conexión segura, o *handshake*, es crucial para el cifrado de extremo a extremo. Este proceso permite el intercambio seguro de la clave simétrica que se utilizará para cifrar los mensajes.
+
+**Escenario:** El usuario A quiere iniciar una conversación con el usuario B (o crear un nuevo grupo).
+
+**Caso 1: Intercambio inicial de claves públicas (A y B no se han comunicado antes)**
+
+Este caso ocurre cuando A y B se conectan por primera vez.
+
+1.  **Conexión WebSocket:** A y B establecen una conexión WebSocket entre sí.
+
+2.  **Intercambio de claves públicas:**
+
+    *   a. **A envía su clave pública a B:** A **envía** un mensaje especial de tipo `publicKeyExchange` que contiene su clave pública RSA a B.
+    *   b. **B recibe la clave pública de A:** B **recibe** el mensaje y **guarda** la clave pública de A en su configuración local, asociándola con el ID de A.
+    *   c. **B envía su clave pública a A:** B **envía** un mensaje de tipo `publicKeyExchange` que contiene su clave pública RSA a A.
+    *   d. **A recibe la clave pública de B:** A **recibe** el mensaje y **guarda** la clave pública de B en su configuración local, asociándola con el ID de B.
+
+3.  **Generación de clave simétrica (A):** A **genera** una clave simétrica aleatoria (AES).
+
+4.  **Cifrado de clave simétrica (A):** A **cifra** la clave simétrica generada con la clave pública de B utilizando RSA.
+
+5.  **Envío de clave simétrica cifrada (A -> B):** A **envía** la clave simétrica cifrada a B a través de WebSocket, dentro de un mensaje `inviteToGroup` (para la creación de grupos) u otro mensaje similar (para chats directos).
+
+6.  **Recepción de clave simétrica cifrada (B):** B **recibe** la clave simétrica cifrada.
+
+7.  **Descifrado de clave simétrica (B):** B **descifra** la clave simétrica recibida utilizando *su clave privada RSA*.
+
+8.  **Almacenamiento de clave simétrica (B):** B **guarda** la clave simétrica descifrada en su configuración local, asociándola con el ID de la conversación o del grupo.
+
+9.  **Comunicación cifrada:** A partir de este momento, A y B **pueden comunicarse de forma segura** utilizando la clave simétrica compartida para cifrar y descifrar los mensajes con AES.
+
+**Caso 2: Claves públicas ya almacenadas (A y B ya se han comunicado antes)**
+
+Este caso ocurre cuando A y B ya se han comunicado previamente y tienen las claves públicas del otro almacenadas en su configuración local.
+
+1.  **Conexión WebSocket:** A y B establecen una conexión WebSocket entre sí.
+
+2.  **Recuperación de claves públicas:**
+
+    *   a. **A recupera la clave pública de B:** A **recupera** la clave pública de B de su configuración local.
+    *   b. **B recupera la clave pública de A:** B **recupera** la clave pública de A de su configuración local.
+
+3.  **Generación de clave simétrica (A):** A **genera** una clave simétrica aleatoria (AES).
+
+4.  **Cifrado de clave simétrica (A):** A **cifra** la clave simétrica generada con la clave pública de B utilizando RSA.
+
+5.  **Envío de clave simétrica cifrada (A -> B):** A **envía** la clave simétrica cifrada a B a través de WebSocket, dentro de un mensaje `inviteToGroup` (para la creación de grupos) u otro mensaje similar (para chats directos).
+
+6.  **Recepción de clave simétrica cifrada (B):** B **recibe** la clave simétrica cifrada.
+
+7.  **Descifrado de clave simétrica (B):** B **descifra** la clave simétrica recibida utilizando *su clave privada RSA*.
+
+8.  **Almacenamiento de clave simétrica (B):** B **guarda** la clave simétrica descifrada en su configuración local, asociándola con el ID de la conversación o del grupo.
+
+9.  **Comunicación cifrada:** A partir de este momento, A y B **pueden comunicarse de forma segura** utilizando la clave simétrica compartida para cifrar y descifrar los mensajes con AES.
+
+### Envío de un mensaje
+
+Este flujo describe el proceso de envío de un mensaje una vez que se ha establecido la conexión segura.
+
+1.  **Escritura del mensaje (A):** El usuario A **escribe** un mensaje.
+2.  **Obtención de la clave simétrica (Cliente de A):** El cliente de A **obtiene** la clave simétrica del grupo desde su configuración local.
+3.  **Cifrado del mensaje (Cliente de A):** El cliente de A **cifra** el mensaje con la clave simétrica utilizando AES.
+4.  **Envío del mensaje cifrado (Cliente de A -> Cliente de B):** El cliente de A **envía** el mensaje cifrado a través de WebSockets al cliente de B (y a otros miembros del grupo, si aplica).
+5.  **Recepción del mensaje cifrado (Cliente de B):** El cliente de B **recibe** el mensaje cifrado.
+6.  **Obtención de la clave simétrica (Cliente de B):** El cliente de B **obtiene** la clave simétrica del grupo desde su configuración local.
+7.  **Descifrado del mensaje (Cliente de B):** El cliente de B **descifra** el mensaje con la clave simétrica utilizando AES.
+8.  **Visualización del mensaje (B):** El mensaje descifrado se **muestra** al usuario B.
+
+![Diagrama de mensaje](flujo.png)
 
 ## Cómo ejecutar la aplicación
 
-1.  Clona el repositorio: `git clone <URL_del_repositorio>`
-2.  Navega al directorio del proyecto: `cd <nombre_del_proyecto>`
-3.  Construye la aplicación: `go build`
-4.  Ejecuta la aplicación: `./<nombre_del_ejecutable>` (necesitarás ejecutar múltiples instancias en diferentes terminales para simular varios usuarios).
+#### Necesitarás ejecutar múltiples instancias en diferentes terminales para simular varios usuarios
 
-## Próximas mejoras (Opcional)
+1.  Clona el repositorio: `git clone https://github.com/osmancadc/go-encrypted-chat.git`
+2.  Navega al directorio del proyecto: `cd go-ecrypted-chat`
+3.  Construye y ejecuta la aplicación: `./scripts/start.sh`
 
-*   Persistencia de mensajes y claves (cifrado en disco).
-*   Interfaz gráfica de usuario (GUI).
-*   Manejo de errores más robusto.
-*   Pruebas unitarias completas.
 
 ## Contribuciones
 
-Las contribuciones son bienvenidas. Si encuentras un error o tienes una sugerencia, por favor abre un issue o un pull request.
+Este proyecto está en constante evolución y siempre hay espacio para mejorar. Creo que la colaboración es la mejor forma de aprender y crecer juntos.
+
+Si te interesa aprender sobre desarrollo en Go, WebSockets, criptografía o simplemente quieres contribuir a un proyecto open source, te invito a participar. Desde la corrección de errores hasta la implementación de nuevas funcionalidades, tu contribución es bienvenida. 
+
+¡Juntos podemos hacer este proyecto aún mejor!
 
 ## Licencia
 
-[Añade la licencia que corresponda (por ejemplo, MIT)](aquí_va_el_enlace_a_la_licencia)
+[MIT License](https://opensource.org/licenses/MIT)
