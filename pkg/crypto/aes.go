@@ -29,6 +29,13 @@ type AES struct {
 	key []byte
 }
 
+func NewAES(key []byte) (*AES, error) {
+	if len(key) != 16 && len(key) != 24 && len(key) != 32 {
+		return nil, fmt.Errorf("the AES is invalid, it must have 16, 24 or 32 bytes")
+	}
+	return &AES{key: key}, nil
+}
+
 func (a *AES) GetKey() []byte {
 	return a.key
 }

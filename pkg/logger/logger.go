@@ -40,6 +40,10 @@ func (l *Logger) WithContext(ctx context.Context) *Logger {
 	return &newLogger
 }
 
+func (l *Logger) Log(message string, fields ...map[string]interface{}) {
+	l.log("CHAT", message, fields...)
+}
+
 func (l *Logger) Debug(message string, fields ...map[string]interface{}) {
 	l.log("DEBUG", message, fields...)
 }
@@ -93,7 +97,7 @@ func (l *Logger) formatMessage(timestamp, level, message string, fields ...map[s
 }
 
 func (l *Logger) shouldLog(level string) bool {
-	levels := map[string]int{"DEBUG": 1, "INFO": 2, "WARN": 3, "ERROR": 4, "FATAL": 5}
+	levels := map[string]int{"CHAT": 0, "DEBUG": 1, "INFO": 2, "WARN": 3, "ERROR": 4, "FATAL": 5}
 	return levels[level] >= levels[l.level]
 }
 
