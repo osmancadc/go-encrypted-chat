@@ -4,38 +4,21 @@ import (
 	"encoding/json"
 
 	"github.com/google/uuid"
-	"github.com/osmancadc/go-encrypted-chat/pkg/crypto"
 )
 
 type User struct {
-	ID        string
-	username  string
-	publicKey []byte
+	ID       string
+	Username string
 }
 
 func NewUser(username string) (*User, error) {
 
 	uuid := uuid.NewString()
 
-	rsaInstance, err := crypto.GenerateRSA(2048)
-	if err != nil {
-		return nil, err
-	}
-
-	publicKey, err := rsaInstance.GetPublicKeyValue()
-	if err != nil {
-		return nil, err
-	}
-
 	return &User{
-		ID:        uuid,
-		username:  username,
-		publicKey: publicKey,
+		ID:       uuid,
+		Username: username,
 	}, nil
-}
-
-func (u *User) GetUserPublicKey() []byte {
-	return u.publicKey
 }
 
 func (u *User) Marshal() ([]byte, error) {

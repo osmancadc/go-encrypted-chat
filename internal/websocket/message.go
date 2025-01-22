@@ -1,12 +1,29 @@
 package websocket
 
 import (
+	"encoding/json"
+
 	"github.com/osmancadc/go-encrypted-chat/internal/chat"
 )
 
 type WebsocketMessage struct {
 	Type    string      `json:"type"`
 	Payload interface{} `json:"payload"`
+}
+
+func (m *WebsocketMessage) Marshal() ([]byte, error) {
+	messageBytes, err := json.Marshal(m)
+	if err != nil {
+		return nil, err
+	}
+
+	return messageBytes, nil
+}
+
+func (m *WebsocketMessage) Unmarshal(data []byte) (message WebsocketMessage, err error) {
+	err = json.Unmarshal(data, &message)
+
+	return
 }
 
 type PublicKeyExchangePayload struct {

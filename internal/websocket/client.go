@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/gorilla/websocket"
-	config "github.com/osmancadc/go-encrypted-chat/configs"
+	"github.com/osmancadc/go-encrypted-chat/config"
 	"github.com/osmancadc/go-encrypted-chat/internal/chat"
 	"github.com/osmancadc/go-encrypted-chat/pkg/crypto"
 	"github.com/osmancadc/go-encrypted-chat/pkg/logger"
@@ -16,8 +16,9 @@ type Client struct {
 }
 
 var (
-	encryptor = crypto.Encryptor{}
-	log       = logger.NewLogger("CHAT")
+	encryptor  = crypto.Encryptor{}
+	log        = logger.NewLogger("CHAT")
+	keysConfig = config.GetConfig()
 )
 
 func (c *Client) HandleConnection() {
@@ -49,7 +50,19 @@ func (c *Client) readMessage() (message WebsocketMessage, err error) {
 	return
 }
 
-func (c *Client) writeMessage(_ WebsocketMessage) (err error) {
+func (c *Client) writeMessage(msg WebsocketMessage) (err error) {
+	writter, err := c.conn.NextWriter(websocket.TextMessage)
+	if err != nil {
+		return
+	}
+
+	encodedMessage, err := msg.Marshal()
+	if err != nil {
+		return
+	}
+
+	writter.Write(encodedMessage)
+
 	return
 }
 
@@ -90,13 +103,19 @@ func (c *Client) handleMessage(msg WebsocketMessage) (err error) {
 	}
 }
 
-func (c *Client) handlePublicKeyExchange(payload PublicKeyExchangePayload) (err error) {
+func (c *Client) handlePublicKeyExchange(payload PublicKeyExchangePayload) error {
 
 	if payload.NeedsPublicKey {
+		rsaInstance := keysConfig.GetRsaInstance()
+		publicKey, err := rsaInstance.GetPublicKeyValue()
+		if err != nil {
+			return err
+		}
+
 		msg := WebsocketMessage{
 			Type: "publicKeyExchange",
 			Payload: PublicKeyExchangePayload{
-				PublicKey:      c.user.GetUserPublicKey(),
+				PublicKey:      publicKey,
 				NeedsPublicKey: false,
 				UserID:         c.user.ID,
 			},
@@ -105,11 +124,11 @@ func (c *Client) handlePublicKeyExchange(payload PublicKeyExchangePayload) (err 
 		c.writeMessage(msg)
 	}
 
-	return
+	return nil
 }
 
 func (c *Client) handleTextMessage(payload TextMessagePayload) (err error) {
-	key := config.GetSymmetricKey(payload.SenderID)
+	key := keysConfig.GetSymmetricKey(payload.SenderID)
 
 	aesInstance, err := crypto.NewAES(key)
 	if err != nil {
