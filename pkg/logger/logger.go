@@ -41,31 +41,64 @@ func (l *Logger) WithContext(ctx context.Context) *Logger {
 }
 
 func (l *Logger) Log(message string, fields ...map[string]interface{}) {
-	l.log("CHAT", message, fields...)
+	l.logln("CHAT", message, fields...)
+}
+
+func (l *Logger) Logf(format string, v ...interface{}) {
+	l.log("CHAT", fmt.Sprintf(format, v...))
 }
 
 func (l *Logger) Debug(message string, fields ...map[string]interface{}) {
-	l.log("DEBUG", message, fields...)
+	l.logln("DEBUG", message, fields...)
+}
+
+func (l *Logger) Debugf(format string, v ...interface{}) {
+	l.log("DEBUG", fmt.Sprintf(format, v...))
 }
 
 func (l *Logger) Info(message string, fields ...map[string]interface{}) {
-	l.log("INFO", message, fields...)
+	l.logln("INFO", message, fields...)
+}
+
+func (l *Logger) Infof(format string, v ...interface{}) {
+	l.log("INFO", fmt.Sprintf(format, v...))
 }
 
 func (l *Logger) Warn(message string, fields ...map[string]interface{}) {
-	l.log("WARN", message, fields...)
+	l.logln("WARN", message, fields...)
+}
+
+func (l *Logger) Warnf(format string, v ...interface{}) {
+	l.log("WARN", fmt.Sprintf(format, v...))
 }
 
 func (l *Logger) Error(message string, fields ...map[string]interface{}) {
-	l.log("ERROR", message, fields...)
+	l.logln("ERROR", message, fields...)
+}
+
+func (l *Logger) Errorf(format string, v ...interface{}) {
+	l.log("ERROR", fmt.Sprintf(format, v...))
 }
 
 func (l *Logger) Fatal(message string, fields ...map[string]interface{}) {
-	l.log("FATAL", message, fields...)
+	l.logln("FATAL", message, fields...)
+	os.Exit(1)
+}
+
+func (l *Logger) Fatalf(format string, v ...interface{}) {
+	l.log("FATAL", fmt.Sprintf(format, v...))
 	os.Exit(1)
 }
 
 func (l *Logger) log(level string, message string, fields ...map[string]interface{}) {
+	if l.shouldLog(level) {
+		timestamp := time.Now().Format(time.RFC3339)
+		logMessage := l.formatMessage(timestamp, level, message, fields...)
+		fmt.Fprint(l.output, logMessage)
+	}
+}
+
+func (l *Logger) logln(level string, message string, fields ...map[string]interface{}) {
 	if l.shouldLog(level) {
 		timestamp := time.Now().Format(time.RFC3339)
 		logMessage := l.formatMessage(timestamp, level, message, fields...)
@@ -97,7 +130,7 @@ func (l *Logger) formatMessage(timestamp, level, message string, fields ...map[s
 }
 
 func (l *Logger) shouldLog(level string) bool {
-	levels := map[string]int{"CHAT": 0, "DEBUG": 1, "INFO": 2, "WARN": 3, "ERROR": 4, "FATAL": 5}
+	levels := map[string]int{"DEBUG": 1, "INFO": 2, "WARN": 3, "ERROR": 4, "FATAL": 5, "CHAT": 6}
 	return levels[level] >= levels[l.level]
 }
 

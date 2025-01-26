@@ -1,4 +1,4 @@
-package chat
+package model
 
 import (
 	"encoding/json"
@@ -11,12 +11,14 @@ type User struct {
 	Username string
 }
 
-func NewUser(username string) (*User, error) {
+func NewUser(userID, username string) (*User, error) {
 
-	uuid := uuid.NewString()
+	if userID == "" {
+		userID = uuid.NewString()
+	}
 
 	return &User{
-		ID:       uuid,
+		ID:       userID,
 		Username: username,
 	}, nil
 }

@@ -3,155 +3,141 @@ package websocket
 import (
 	"encoding/json"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gorilla/websocket"
-	"github.com/osmancadc/go-encrypted-chat/config"
-	"github.com/osmancadc/go-encrypted-chat/internal/chat"
-	"github.com/osmancadc/go-encrypted-chat/pkg/crypto"
+	"github.com/osmancadc/go-encrypted-chat/internal/model"
+	"github.com/osmancadc/go-encrypted-chat/internal/view"
 	"github.com/osmancadc/go-encrypted-chat/pkg/logger"
 )
 
-type Client struct {
-	conn *websocket.Conn
-	user *chat.User
+var log = logger.NewLogger("INFO")
+
+type ClientHandler struct {
+	Conn            *Connection
+	program         *tea.Program
+	externalMsgChan chan model.IncomingMessage
 }
 
-var (
-	encryptor  = crypto.Encryptor{}
-	log        = logger.NewLogger("CHAT")
-	keysConfig = config.GetConfig()
-)
+func NewClientHandler(conn *Connection) *ClientHandler {
+	return &ClientHandler{
+		Conn:            conn,
+		externalMsgChan: make(chan model.IncomingMessage),
+	}
+}
 
-func (c *Client) HandleConnection() {
-	defer func() {
-		c.conn.Close()
+func (h *ClientHandler) Run() {
+	u := "ws://localhost:8080/ws"
+
+	conn, _, err := websocket.DefaultDialer.Dial(u, nil)
+	if err != nil {
+		log.Fatalf("Error connecting to WebSocket: %v\n", err)
+	}
+	h.Conn.SetConn(conn)
+	h.Conn.SetChat()
+
+	go h.readPump()
+	go h.writePump()
+
+	log.Info("Client connected to server")
+
+	h.sendMessage(model.WebsocketMessage{
+		Type: "usernameMessage",
+		Payload: model.UsernamePayload{
+			Username: h.Conn.User.Username,
+		},
+	})
+
+	chatModel := view.InitialModel(h.Conn.GetConn(), h.Conn.User.Username)
+	h.program = tea.NewProgram(chatModel)
+
+	go func() {
+		for msg := range chatModel.Send {
+			websocketMsg := model.WebsocketMessage{
+				Type: "textMessage",
+				Payload: model.TextMessagePayload{
+					Content:  msg.Content,
+					SenderID: msg.SenderID,
+				},
+			}
+			h.sendMessage(websocketMsg)
+		}
 	}()
+
+	go func() {
+		for msg := range h.externalMsgChan {
+			h.program.Send(msg)
+		}
+	}()
+
+	_, err = h.program.Run()
+	if err != nil {
+		log.Fatalf("error: %v", err)
+	}
+
+}
+
+func (h *ClientHandler) readPump() {
+	defer h.Conn.Close()
+	log.Debug("Entered to readPump")
 	for {
-		message, err := c.readMessage()
+		_, message, err := h.Conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Error(err.Error())
+				log.Errorf("Read error: %v\n", err)
 			}
 			break
 		}
-
-		err = c.handleMessage(message)
-		if err != nil {
-			log.Error(err.Error())
-			continue
-		}
+		h.handleMessage(message)
 	}
 }
 
-func (c *Client) readMessage() (message WebsocketMessage, err error) {
-	var msg WebsocketMessage
+func (h *ClientHandler) writePump() {
+	defer h.Conn.Close()
+	log.Debug("Entered to write Pump")
 
-	err = c.conn.ReadJSON(&msg)
-
-	return
+	for message := range h.Conn.GetSendChan() {
+		err := h.Conn.WriteMessage(websocket.TextMessage, message)
+		if err != nil {
+			log.Errorf("Write error: %v\n", err)
+			break
+		}
+		log.Debug("Message sended successfully")
+	}
 }
 
-func (c *Client) writeMessage(msg WebsocketMessage) (err error) {
-	writter, err := c.conn.NextWriter(websocket.TextMessage)
+func (h *ClientHandler) handleMessage(message []byte) (err error) {
+	var chatMessage model.WebsocketMessage
+	err = json.Unmarshal(message, &chatMessage)
+	if err != nil {
+		log.Errorf("Failed to unmarshal message: %s", err.Error())
+		return
+	}
+
+	var textMsg model.TextMessagePayload
+
+	byteMsg, err := json.Marshal(chatMessage.Payload)
 	if err != nil {
 		return
 	}
 
-	encodedMessage, err := msg.Marshal()
+	err = textMsg.Unmarshal(byteMsg)
 	if err != nil {
 		return
 	}
 
-	writter.Write(encodedMessage)
-
-	return
-}
-
-func (c *Client) handleMessage(msg WebsocketMessage) (err error) {
-	switch msg.Type {
-	case "publicKeyExchange":
-		var payload PublicKeyExchangePayload
-		err := json.Unmarshal([]byte(msg.Payload.(string)), &payload)
-		if err != nil {
-			return err
-		}
-		return c.handlePublicKeyExchange(payload)
-	case "textMessage":
-		var payload TextMessagePayload
-		err := json.Unmarshal([]byte(msg.Payload.(string)), &payload)
-		if err != nil {
-			return err
-		}
-		return c.handleTextMessage(payload)
-
-	case "inviteToGroup":
-		var payload InviteToGroupPayload
-		err := json.Unmarshal([]byte(msg.Payload.(string)), &payload)
-		if err != nil {
-			return err
-		}
-		return c.handleInviteToGroup(payload)
-	case "acceptInvite":
-		var payload AcceptInvitePayload
-		err := json.Unmarshal([]byte(msg.Payload.(string)), &payload)
-		if err != nil {
-			return err
-		}
-		return c.handleAcceptInvite(payload)
-	default:
-		log.Info("Tipo de mensaje desconocido")
-		return nil
-	}
-}
-
-func (c *Client) handlePublicKeyExchange(payload PublicKeyExchangePayload) error {
-
-	if payload.NeedsPublicKey {
-		rsaInstance := keysConfig.GetRsaInstance()
-		publicKey, err := rsaInstance.GetPublicKeyValue()
-		if err != nil {
-			return err
-		}
-
-		msg := WebsocketMessage{
-			Type: "publicKeyExchange",
-			Payload: PublicKeyExchangePayload{
-				PublicKey:      publicKey,
-				NeedsPublicKey: false,
-				UserID:         c.user.ID,
-			},
-		}
-
-		c.writeMessage(msg)
-	}
-
+	incomingMsg := model.IncomingMessage{Message: textMsg}
+	h.externalMsgChan <- incomingMsg
 	return nil
 }
 
-func (c *Client) handleTextMessage(payload TextMessagePayload) (err error) {
-	key := keysConfig.GetSymmetricKey(payload.SenderID)
-
-	aesInstance, err := crypto.NewAES(key)
+func (h *ClientHandler) sendMessage(msg model.WebsocketMessage) (err error) {
+	log.Debug("Entered to send message")
+	msgBytes, err := json.Marshal(msg)
 	if err != nil {
+		log.Errorf("Error parsing: %v\n", err.Error())
 		return
 	}
+	h.Conn.GetSendChan() <- msgBytes
 
-	plaintext, err := aesInstance.DecryptWithAESGCM(&encryptor, []byte(payload.Content))
-	if err != nil {
-		return
-	}
-
-	log.Log(string(plaintext))
-	return
-}
-
-func (c *Client) handleInviteToGroup(_ InviteToGroupPayload) (err error) {
-	// TODO: Implement invite to groups in the chat
-	log.Info("Group feature it's still not available, we're sorry.")
-	return
-}
-
-func (c *Client) handleAcceptInvite(_ AcceptInvitePayload) (err error) {
-	log.Info("Group feature it's still not available, we're sorry.")
-	// TODO: Implement accept groups in the chat
 	return
 }
