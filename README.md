@@ -1,83 +1,107 @@
-# Chat Encriptado de Extremo a Extremo (E2E) en Golang
+# End-to-End (E2E) Encrypted Chat in Golang
 
-<!-- ![Logo](logo.png) -->
-**Un chat seguro y descentralizado, donde tu privacidad es lo primero.** 
+A privacy-focused chat application built with Golang, WebSockets, and [Bubble Tea](https://github.com/charmbracelet/bubbletea) for a rich terminal user interface.
 
-Este proyecto implementa una aplicación de chat encriptado de extremo a extremo (E2E) utilizando Go y WebSockets. A diferencia de las aplicaciones de chat tradicionales, no hay un servidor central que almacene o tenga acceso a tus mensajes. Solo tú y los destinatarios previstos pueden leerlos.
+**Privacy and End-to-End Encryption:**
 
-## Características Principales
+This project prioritizes user privacy through end-to-end encryption (E2E). Unlike traditional chat applications that store messages on a central server, this project ensures that **only the conversation participants can read the messages**.
 
-*   **Encriptación de Extremo a Extremo (E2E):** Los mensajes se cifran en el dispositivo del remitente y solo se descifran en el dispositivo del destinatario. Nadie más, ni siquiera la propia aplicación, puede leerlos.
-*   **Seguridad:** Se utilizan algoritmos criptográficos robustos:
-    *   RSA para el intercambio seguro de claves simétricas.
-    *   AES para el cifrado de los mensajes.
-*   **Comunicación en tiempo real:** Se utilizan WebSockets para una comunicación fluida e instantánea.
-*   **Manejo seguro de claves:** Las claves privadas nunca se transmiten ni se almacenan de forma insegura.
+**Client-Server Architecture and the Privacy Focus:**
 
-## Arquitectura
+While a client-server architecture with WebSockets is used to facilitate real-time communication, **the server acts solely as a conduit for encrypted messages**. The server **does not have access to encryption keys or message content**.
 
-El proyecto se divide en los siguientes paquetes principales:
+The secure connection establishment (handshake) flow is as follows:
 
+1.  Clients establish independent WebSocket connections with the server.
+2.  Clients exchange public keys using RSA through the server. The server simply relays these keys without storing or analyzing them.
+3.  Once public keys are exchanged, a symmetric key (AES) is generated on the initiating client.
+4.  This symmetric key is encrypted with the recipient's public key and sent through the server.
+5.  The recipient decrypts the symmetric key using their private key.
+6.  From this point on, all messages are encrypted with the shared symmetric key using AES and transmitted through the server.
 
+**This process ensures that:**
 
-*   `cmd/server`: Contiene el punto de entrada principal de la aplicación (`main.go`).
-*   `config`: Gestiona la configuración de la aplicación, incluyendo las claves criptográficas (`config.go`). 
-*   `internal/websocket`: Maneja la comunicación WebSocket.
-    *   `client.go`: Gestiona las conexiones WebSocket individuales.
-    *   `message.go`: Define las estructuras de los mensajes y payloads.
-*   `pkg/chat`: Contiene la lógica del chat.
-    *   `encryption.go`: Funciones de encriptación específicas del chat.
-    *   `message.go`: Estructuras de mensajes del chat.
-    *   `room.go`: Lógica de las salas de chat.
-    *   `user.go`: Define la estructura `User`.
-*   `pkg/crypto`: Contiene la implementación del cifrado.
-    *   `aes.go`: Funciones para cifrado AES.
-    *   `rsa.go`: Funciones para cifrado RSA.
-*   `logger`: Contiene la lógica de logging de la aplicación.
+*   **The server never has access to the symmetric keys or the message content.**
+*   **Only the conversation participants can decrypt the messages.**
+*   Privacy is maintained even in a client-server architecture.
 
-## Descripción de los paquetes
+**Key Technologies:**
 
-*   **`cmd/`**: Contiene el punto de entrada principal de la aplicación (`main.go`). Este archivo se encarga de parsear los flags `-server` y `-client` para iniciar la aplicación en el modo correspondiente. La lógica principal de la aplicación reside en los paquetes dentro de `internal`.
+*   **Golang:** Programming language for the backend and encryption logic.
+*   **WebSockets:** For real-time communication between clients and the server.
+*   **RSA and AES:** Asymmetric and symmetric encryption algorithms, respectively, for key exchange and message encryption.
+*   **Bubble Tea:** Framework for building interactive terminal user interfaces.
 
-*   **`config/`**: Contiene los archivos de configuración de la aplicación, como la configuración del servidor, las claves criptográficas, etc.
+## Key Features
 
-*   **`internal/`**: Contiene el código fuente interno de la aplicación. Este código *no debe ser importado por proyectos externos*.
+*   **End-to-End Encryption (E2E):** Messages are encrypted on the sender's device and only decrypted on the recipient's device. No one else, not even the application itself, can read them.
+*   **Security:** Robust cryptographic algorithms are used:
+    *   RSA for secure exchange of symmetric keys.
+    *   AES for message encryption.
+*   **Real-time communication:** WebSockets are used for smooth and instant communication.
+*   **Secure key management:** Private keys are never transmitted or stored insecurely.
 
-    *   **`view/`**: Contiene la lógica de la interfaz de usuario, utilizando la librería Bubble Tea. El archivo `chat.go` define el modelo, la lógica de actualización (`Update`) y la vista (`View`) del chat.
-    
-    *   **`model/`**: Define las estructuras de datos que se utilizan para la comunicación a través de WebSockets.
-        *   `chat.go`: Contiene los modelos relacionados con el estado del chat en la interfaz de usuario (`ModelChat`, `IncomingMessage`, etc.). `IncomingMessage` se utiliza para comunicar mensajes desde la capa de websocket a la capa de UI.
-        *   `message.go`: Contiene los modelos que representan los mensajes que se intercambian a través del WebSocket (`TextMessagePayload`, `WebsocketMessage`, etc.). `TextMessagePayload` es la estructura de datos que se envia por el websocket. `WebsocketMessage` es un envoltorio que contiene el tipo de mensaje y el payload.
-    
-        *   `user.go`: Contiene el modelo que representa al estrcutura basica de un usuario logeado en la plataforma.
+## Architecture
 
+The project is divided into the following main packages:
 
-    *   **`websocket/`**: Contiene toda la lógica relacionada con la comunicación mediante WebSockets.
+*   `cmd/server`: Contains the main entry point of the application (`main.go`).
+*   `config`: Manages application configuration, including cryptographic keys (`config.go`).
+*   `internal/websocket`: Handles WebSocket communication.
+    *   `client.go`: Manages individual WebSocket connections.
+    *   `message.go`: Defines message and payload structures.
+*   `pkg/chat`: Contains the chat logic.
+    *   `encryption.go`: Chat-specific encryption functions.
+    *   `message.go`: Chat message structures.
+    *   `room.go`: Chat room logic.
+    *   `user.go`: Defines the `User` structure.
+*   `pkg/crypto`: Contains the encryption implementation.
+    *   `aes.go`: Functions for AES encryption.
+    *   `rsa.go`: Functions for RSA encryption.
+*   `logger`: Contains the application's logging logic.
 
-        *   **`client/`**: Lógica específica del cliente WebSocket, incluyendo:
-            *   Establecimiento de la conexión WebSocket.
-            *   Manejo de mensajes enviados y recibidos desde el cliente.
-            *   Integración con la interfaz de usuario (en `internal/ui`).
+### Package Description
 
-        *   **`server/`**: Lógica específica del servidor WebSocket, incluyendo:
-            *   Gestión de las conexiones de los clientes.
-            *   Broadcast de mensajes a los clientes conectados.
-            *   Manejo de eventos de conexión y desconexión.
+*   **`cmd/`**: Contains the main entry point of the application (`main.go`). This file is responsible for parsing the `-server` and `-client` flags to start the application in the corresponding mode. The main application logic resides in the packages within `internal`.
 
-        *   **`handler/`**: Manejadores para los diferentes eventos del WebSocket. Estos manejadores contienen la lógica para procesar los mensajes recibidos y realizar las acciones correspondientes (ej. encriptar, desencriptar, etc).
-        
-        *   `connection.go`: Maneja la creación, gestión y cierre de las conexiones WebSocket, tanto del lado del cliente como del servidor.
+*   **`config/`**: Contains the application's configuration files, such as server configuration, cryptographic keys, etc.
 
+*   **`internal/`**: Contains the application's internal source code. This code *should not be imported by external projects*.
 
-*   **`pkg/`**: Contiene librerías reutilizables *dentro del proyecto*.
+    *   **`view/`**: Contains the user interface logic, using the Bubble Tea library. The `chat.go` file defines the model, update logic (`Update`), and view (`View`) of the chat.
 
-    *   **`crypto/`**: Contiene las funciones de cifrado.
-        *   **`aes/`**: Implementación del cifrado AES.
-        *   **`rsa/`**: Implementación del cifrado RSA.
+    *   **`model/`**: Defines the data structures used for communication via WebSockets.
+        *   `chat.go`: Contains the models related to the chat state in the user interface (`ModelChat`, `IncomingMessage`, etc.). `IncomingMessage` is used to communicate messages from the WebSocket layer to the UI layer.
+        *   `message.go`: Contains the models that represent the messages exchanged through the WebSocket (`TextMessagePayload`, `WebsocketMessage`, etc.). `TextMessagePayload` is the data structure sent through the WebSocket. `WebsocketMessage` is a wrapper that contains the message type and the payload.
 
-    *   **`logger/`**: Contiene la lógica para el manejo de logs.
+        *   `user.go`: Contains the model that represents the basic structure of a logged-in user on the platform.
 
-### Diagrama de componentes 
+    *   **`websocket/`**: Contains all logic related to WebSocket communication.
+
+        *   **`client/`**: Specific logic for the WebSocket client, including:
+            *   Establishing the WebSocket connection.
+            *   Handling messages sent and received from the client.
+            *   Integration with the user interface (in `internal/ui`).
+
+        *   **`server/`**: Specific logic for the WebSocket server, including:
+            *   Managing client connections.
+            *   Broadcasting messages to connected clients.
+            *   Handling connection and disconnection events.
+
+        *   **`handler/`**: Handlers for different WebSocket events. These handlers contain the logic to process received messages and perform the corresponding actions (e.g., encrypt, decrypt, etc.).
+
+        *   `connection.go`: Handles the creation, management, and closing of WebSocket connections, both on the client and server side.
+
+*   **`pkg/`**: Contains reusable libraries *within the project*.
+
+    *   **`crypto/`**: Contains the encryption functions.
+        *   **`aes/`**: AES encryption implementation.
+        *   **`rsa/`**: RSA encryption implementation.
+
+    *   **`logger/`**: Contains the logic for log handling.
+
+### Component Diagram
+
 ```mermaid
 graph LR
     subgraph "cmd"
@@ -146,99 +170,96 @@ graph LR
     linkStyle default stroke: #000
 ```
 
-## Flujos de funcionamiento
+## Operating Flows
 
-### Establecimiento de una conexión segura (Handshake)
+### Establishing a Secure Connection (Handshake)
 
-El establecimiento de una conexión segura, o *handshake*, es crucial para el cifrado de extremo a extremo. Este proceso permite el intercambio seguro de la clave simétrica que se utilizará para cifrar los mensajes. En una arquitectura con servidor central, el servidor actúa como intermediario para este intercambio.
+Establishing a secure connection, or *handshake*, is crucial for end-to-end encryption. This process allows for the secure exchange of the symmetric key that will be used to encrypt messages. In an architecture with a central server, the server acts as an intermediary for this exchange.
 
-**Escenario:** El usuario A quiere iniciar una conversación con el usuario B (o crear un nuevo grupo).
+**Scenario:** User A wants to start a conversation with user B (or create a new group).
 
-**Caso 1: Intercambio inicial de claves públicas (A y B no se han comunicado antes)**
+**Case 1: Initial Public Key Exchange (A and B have not communicated before)**
 
-Este caso ocurre cuando A y B se conectan por primera vez.
+This case occurs when A and B connect for the first time.
 
-1.  **Conexión WebSocket (Cliente A y Cliente B):** Los clientes de A y B (en `internal/websocket/client/client.go`) establecen conexiones WebSocket *independientes* con el servidor (`internal/websocket/server/server.go`).
+1.  **WebSocket Connection (Client A and Client B):** Clients A and B (in `internal/websocket/client/client.go`) establish *independent* WebSocket connections with the server (`internal/websocket/server/server.go`).
 
-2.  **Intercambio de claves públicas (a través del servidor):**
+2.  **Public Key Exchange (through the server):**
 
-    a.  **Envío de clave pública (Cliente A -> Servidor):** El cliente de A genera su par de claves RSA (en `pkg/crypto/rsa/rsa.go`) si no lo tiene ya, y envía un mensaje de tipo `publicKeyExchange` (definido en `internal/websocket/model/message.go`) que contiene su clave pública RSA al *servidor* a través de su conexión WebSocket. El handler del cliente (`internal/websocket/client/handler.go`) se encarga de formatear el mensaje y enviarlo.
+    a.  **Sending Public Key (Client A -> Server):** Client A generates its RSA key pair (in `pkg/crypto/rsa/rsa.go`) if it doesn't already have one, and sends a `publicKeyExchange` type message (defined in `internal/websocket/model/message.go`) containing its RSA public key to the *server* through its WebSocket connection. The client handler (`internal/websocket/client/handler.go`) is responsible for formatting the message and sending it.
 
-    b.  **Recepción y retransmisión de clave pública (Handler Servidor):** El handler del servidor (`internal/websocket/server/handler.go`) recibe el mensaje de A, identifica al destinatario B, y retransmite la clave pública de A al cliente de B a través de la conexión WebSocket de B.
+    b.  **Receiving and Relaying Public Key (Server Handler):** The server handler (`internal/websocket/server/handler.go`) receives the message from A, identifies the recipient B, and relays A's public key to B's client through B's WebSocket connection.
 
-    c.  **Recepción y almacenamiento de clave pública (Handler Cliente B):** El handler del cliente de B (`internal/websocket/client/handler.go`) recibe la clave pública de A y la almacena en el modelo de usuario (`internal/model/user.go`), asociándola con el ID de A.
+    c.  **Receiving and Storing Public Key (Client B Handler):** Client B's handler (`internal/websocket/client/handler.go`) receives A's public key and stores it in the user model (`internal/model/user.go`), associating it with A's ID.
 
-    d.  **Envío de clave pública (Cliente B -> Servidor):** Similar al paso a, pero B envía su clave pública al servidor.
+    d.  **Sending Public Key (Client B -> Server):** Similar to step a, but B sends its public key to the server.
 
-    e.  **Recepción y retransmisión de clave pública (Handler Servidor):** El handler del servidor recibe el mensaje de B y lo retransmite a A.
+    e.  **Receiving and Relaying Public Key (Server Handler):** The server handler receives the message from B and relays it to A.
 
-    f.  **Recepción y almacenamiento de clave pública (Handler Cliente A):** Similar al paso c, pero A recibe y almacena la clave pública de B.
+    f.  **Receiving and Storing Public Key (Client A Handler):** Similar to step c, but A receives and stores B's public key.
 
-3.  **Generación de clave simétrica (Cliente A):** El cliente de A genera una clave simétrica aleatoria (AES) utilizando `pkg/crypto/aes/aes.go`.
+3.  **Symmetric Key Generation (Client A):** Client A generates a random symmetric key (AES) using `pkg/crypto/aes/aes.go`.
 
-4.  **Cifrado de clave simétrica (Cliente A):** El cliente de A cifra la clave simétrica generada con la clave pública de B utilizando RSA (`pkg/crypto/rsa/rsa.go`).
+4.  **Symmetric Key Encryption (Client A):** Client A encrypts the generated symmetric key with B's public key using RSA (`pkg/crypto/rsa/rsa.go`).
 
-5.  **Envío de clave simétrica cifrada (Cliente A -> Servidor -> Cliente B):** El cliente de A envía la clave simétrica cifrada al *servidor*, quien a su vez la retransmite al cliente de B. Esto se realiza dentro de un mensaje `inviteToGroup` (para la creación de grupos) u otro mensaje similar (para chats directos), manejado por el handler.
+5.  **Sending Encrypted Symmetric Key (Client A -> Server -> Client B):** Client A sends the encrypted symmetric key to the *server*, which in turn relays it to Client B. This is done within an `inviteToGroup` message (for group creation) or another similar message (for direct chats), handled by the handler.
 
-6.  **Recepción de clave simétrica cifrada (Handler Cliente B):** El handler del cliente de B recibe el mensaje del servidor.
+6.  **Receiving Encrypted Symmetric Key (Client B Handler):** Client B's handler receives the message from the server.
 
-7.  **Descifrado de clave simétrica (Cliente B):** El cliente de B descifra la clave simétrica recibida utilizando *su* clave privada RSA (`pkg/crypto/rsa/rsa.go`).
+7.  **Symmetric Key Decryption (Client B):** Client B decrypts the received symmetric key using *its* RSA private key (`pkg/crypto/rsa/rsa.go`).
 
-8.  **Almacenamiento de clave simétrica (Cliente B):** El cliente de B guarda la clave simétrica descifrada en el modelo de usuario (`internal/model/user.go`), asociándola con el ID de la conversación o del grupo.
+8.  **Symmetric Key Storage (Client B):** Client B stores the decrypted symmetric key in the user model (`internal/model/user.go`), associating it with the conversation or group ID.
 
-9.  **Comunicación cifrada:** A partir de este momento, A y B pueden comunicarse de forma segura utilizando la clave simétrica compartida. Los mensajes cifrados se enviarán a través del servidor.
+9.  **Encrypted Communication:** From this point on, A and B can communicate securely using the shared symmetric key. Encrypted messages will be sent through the server.
 
-**Caso 2: Claves públicas ya almacenadas (A y B ya se han comunicado antes)**
+**Case 2: Public Keys Already Stored (A and B have communicated before)**
 
-Este caso ocurre cuando A y B ya se han comunicado previamente y tienen las claves públicas del otro almacenadas en su configuración local. El flujo es similar al caso 1, pero se omiten los pasos de intercambio de claves públicas (2a-2f).
+This case occurs when A and B have already communicated previously and have each other's public keys stored in their local configuration. The flow is similar to case 1, but the public key exchange steps (2a-2f) are omitted.
 
-1.  **Conexión WebSocket (Cliente A y Cliente B):** Los clientes de A y B establecen una conexión WebSocket con el servidor.
+1.  **WebSocket Connection (Client A and Client B):** Clients A and B establish a WebSocket connection with the server.
 
-2.  **Recuperación de claves públicas (Cliente A y Cliente B):** Los clientes de A y B recuperan las claves públicas del otro desde el modelo de usuario (`internal/model/user.go`).
+2.  **Retrieving Public Keys (Client A and Client B):** Clients A and B retrieve each other's public keys from the user model (`internal/model/user.go`).
 
-3.  **Generación, cifrado, envío, recepción, descifrado y almacenamiento de clave simétrica:** Los pasos 3-8 del Caso 1 aplican aquí.
+3.  **Symmetric Key Generation, Encryption, Sending, Receiving, Decryption, and Storage:** Steps 3-8 of Case 1 apply here.
 
-4.  **Comunicación cifrada:** A partir de este momento, A y B pueden comunicarse de forma segura utilizando la clave simétrica compartida. Los mensajes cifrados se enviarán a través del servidor.
+4.  **Encrypted Communication:** From this point on, A and B can communicate securely using the shared symmetric key. Encrypted messages will be sent through the server.
 
-### Envío de un mensaje
+### Sending a Message
 
-Este flujo, en esencia, no cambia mucho con la introducción del servidor, solo que los mensajes ahora pasan por él:
+This flow, in essence, doesn't change much with the introduction of the server, only that messages now pass through it:
 
-1.  **Escritura del mensaje (Vista Chat):** El usuario A escribe un mensaje en la interfaz de usuario (`internal/view/chat.go`).
+1.  **Writing the Message (Chat View):** User A writes a message in the user interface (`internal/view/chat.go`).
 
-2.  **Obtención de la clave simétrica (Vista Chat):** La vista del chat (`internal/view/chat.go`) obtiene la clave simétrica del modelo de usuario (`internal/model/user.go`).
+2.  **Obtaining the Symmetric Key (Chat View):** The chat view (`internal/view/chat.go`) obtains the symmetric key from the user model (`internal/model/user.go`).
 
-3.  **Cifrado del mensaje (Cliente A):** El cliente de A (`internal/websocket/client/client.go`) cifra el mensaje con la clave simétrica utilizando AES (`pkg/crypto/aes/aes.go`).
+3.  **Encrypting the Message (Client A):** Client A (`internal/websocket/client/client.go`) encrypts the message with the symmetric key using AES (`pkg/crypto/aes/aes.go`).
 
-4.  **Envío del mensaje cifrado (Cliente A -> Servidor -> Cliente B):** El cliente de A envía el mensaje cifrado al *servidor*, quien a su vez lo retransmite al cliente de B. El handler del cliente (`internal/websocket/client/handler.go`) se encarga de formatear el mensaje para ser enviado.
+4.  **Sending the Encrypted Message (Client A -> Server -> Client B):** Client A sends the encrypted message to the *server*, which in turn relays it to Client B. The client handler (`internal/websocket/client/handler.go`) is responsible for formatting the message to be sent.
 
-5.  **Recepción del mensaje cifrado (Handler Cliente B):** El handler del cliente de B (`internal/websocket/client/handler.go`) recibe el mensaje cifrado *del servidor*.
+5.  **Receiving the Encrypted Message (Client B Handler):** Client B's handler (`internal/websocket/client/handler.go`) receives the encrypted message *from the server*.
 
-6.  **Obtención de la clave simétrica (Cliente B):** El cliente de B obtiene la clave simétrica del modelo de usuario (`internal/model/user.go`).
+6.  **Obtaining the Symmetric Key (Client B):** Client B obtains the symmetric key from the user model (`internal/model/user.go`).
 
-7.  **Descifrado del mensaje (Cliente B):** El cliente de B descifra el mensaje con la clave simétrica utilizando AES (`pkg/crypto/aes/aes.go`).
+7.  **Decrypting the Message (Client B):** Client B decrypts the message with the symmetric key using AES (`pkg/crypto/aes/aes.go`).
 
-8.  **Visualización del mensaje (Vista Chat):** El cliente de B envía el mensaje descifrado a la vista del chat (`internal/view/chat.go`) para que se muestre al usuario B.
+8.  **Displaying the Message (Chat View):** Client B sends the decrypted message to the chat view (`internal/view/chat.go`) to be displayed to user B.
 
+## How to Run the Application
 
+#### You will need to run multiple instances in different terminals to simulate multiple users
 
-## Cómo ejecutar la aplicación
+1.  Clone the repository: `git clone https://github.com/osmancadc/go-encrypted-chat.git`
+2.  Navigate to the project directory: `cd go-ecrypted-chat`
+3.  Build and run the application: `./scripts/start.sh [-server] [-client] [username]`
 
-#### Necesitarás ejecutar múltiples instancias en diferentes terminales para simular varios usuarios
+## Contributions
 
-1.  Clona el repositorio: `git clone https://github.com/osmancadc/go-encrypted-chat.git`
-2.  Navega al directorio del proyecto: `cd go-ecrypted-chat`
-3.  Construye y ejecuta la aplicación: `./scripts/start.sh [-server] [-client] [username]`
+This project is constantly evolving and there is always room for improvement. I believe that collaboration is the best way to learn and grow together.
 
+If you are interested in learning about Go development, WebSockets, cryptography, or simply want to contribute to an open-source project, I invite you to participate. From bug fixes to the implementation of new features, your contribution is welcome.
 
-## Contribuciones
+Together we can make this project even better!
 
-Este proyecto está en constante evolución y siempre hay espacio para mejorar. Creo que la colaboración es la mejor forma de aprender y crecer juntos.
-
-Si te interesa aprender sobre desarrollo en Go, WebSockets, criptografía o simplemente quieres contribuir a un proyecto open source, te invito a participar. Desde la corrección de errores hasta la implementación de nuevas funcionalidades, tu contribución es bienvenida. 
-
-¡Juntos podemos hacer este proyecto aún mejor!
-
-## Licencia
+## License
 
 [MIT License](https://opensource.org/licenses/MIT)
