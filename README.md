@@ -84,7 +84,7 @@ graph LR
         main["main.go"]
     end
 
-    subgraph "config"
+    subgraph "config_logic"
         config["config.go"]
     end
 
@@ -99,11 +99,11 @@ graph LR
             messageModel["message.go"]
         end
         subgraph "websocket"
-            subgraph "client"
+            subgraph "client_logic"
                 client["client.go"]
                 handlerClient["handler.go"]
             end
-            subgraph "server"
+            subgraph "server_logic"
                 server["server.go"]
                 handlerServer["handler.go"]
             end
@@ -113,59 +113,37 @@ graph LR
 
     subgraph "pkg"
         subgraph "crypto"
-            subgraph "aes"
-                aes["aes.go"]
-            end
-            subgraph "rsa"
-                rsa["rsa.go"]
-            end
+            aes["aes.go"]
+            rsa["rsa.go"]
         end
         logger["logger.go"]
     end
 
-    main --> config
+    main --> config_logic
     main --> logger
-    main --> client
-    main --> server
+    main --> websocket
 
-    client --> connection
-    client --> chat
-    client --> messageModel
+    websocket --> model
+    websocket --> crypto
 
-    handlerClient --> messageModel
-    handlerClient --> userModel
-    handlerClient --> roomModel
-    handlerClient --> encryptionModel
-    handlerClient --> aes
-    handlerClient --> rsa
-    handlerClient --> connection
+    view --> model
+    view --> websocket
 
-    server --> connection
-    handlerServer --> messageModel
-    handlerServer --> userModel
-    handlerServer --> roomModel
-    handlerServer --> encryptionModel
-    handlerServer --> aes
-    handlerServer --> rsa
-        handlerServer --> connection
+    style cmd fill:#b0d9ff,stroke:#000,stroke-width:2px,color:#000
+    style config_logic fill:#d1ffb3,stroke:#000,stroke-width:2px,color:#000
+    style internal fill:#ffe9af,stroke:#000,stroke-width:2px,color:#000
+    style view fill:#ffd0fc,stroke:#000,stroke-width:2px,color:#000
+    style websocket fill:#b0d9ff,stroke:#000,stroke-width:2px,color:#000
+    style client_logic fill:#d1ffb3,stroke:#000,stroke-width:2px,color:#000
+    style server_logic fill:#ffe9af,stroke:#000,stroke-width:2px,color:#000
+    style model fill:#ffd0fc,stroke:#000,stroke-width:2px,color:#000
+    style pkg fill:#b0d9ff,stroke:#000,stroke-width:2px,color:#000
+    style crypto fill:#d1ffb3,stroke:#000,stroke-width:2px,color:#000
+    style aes fill:#ffe9af,stroke:#000,stroke-width:2px,color:#000
+    style rsa fill:#ffd0fc,stroke:#000,stroke-width:2px,color:#000
+    style logger fill:#b0d9ff,stroke:#000,stroke-width:2px,color:#000
 
-    chat --> messageModel
-    chat --> userModel
-    chat --> roomModel
-    chat --> client
-
-    style cmd fill:#ccf,stroke:#888,stroke-width:2px
-    style config fill:#ccf,stroke:#888,stroke-width:2px
-    style internal fill:#bbf,stroke:#666,stroke-width:2px
-    style view fill:#dde,stroke:#777,stroke-width:2px
-    style websocket fill:#aae,stroke:#444,stroke-width:2px
-    style client fill:#ccf,stroke:#888,stroke-width:2px
-    style server fill:#ccf,stroke:#888,stroke-width:2px
-    style model fill:#dde,stroke:#777,stroke-width:2px
-    style pkg fill:#99f,stroke:#222,stroke-width:2px
-    style crypto fill:#bbf,stroke:#666,stroke-width:2px
-    style aes fill:#ccf,stroke:#888,stroke-width:2px
-    style rsa fill:#ccf,stroke:#888,stroke-width:2px
+    linkStyle default stroke: #000
 ```
 
 ## Flujos de funcionamiento
